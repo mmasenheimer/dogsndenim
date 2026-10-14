@@ -1,0 +1,33 @@
+# systemd unit that starts the camera website on boot.
+# Edit User and the paths below if your username or project folder is different.
+#
+# Install:
+#   sudo cp dogsndenim.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now dogsndenim
+#
+# Logs:
+#   journalctl -u dogsndenim -f
+
+[Unit]
+Description=Dogs n Denim camera website
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=pi
+Group=video
+WorkingDirectory=/home/pi/dogsndenim
+ExecStart=/home/pi/dogsndenim/venv/bin/python website.py
+Environment=PYTHONUNBUFFERED=1
+Environment=CAMERA_INDEX=0
+Environment=CAMERA_WIDTH=1280
+Environment=CAMERA_HEIGHT=720
+Environment=CAMERA_FPS=15
+Environment=JPEG_QUALITY=80
+Environment=PORT=5000
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
