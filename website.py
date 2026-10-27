@@ -85,7 +85,7 @@ class Camera:
             print(f"Camera {CAMERA_INDEX} opened", flush=True)
             self.connected = True
             failures = 0
-            last_sent = 0.0
+            next_send = 0.0
 
             while failures < 10:
                 success, frame = capture.read()
@@ -95,15 +95,19 @@ class Camera:
                     continue
                 failures = 0
 
-                # Drop frames beyond the FPS cap to save CPU and bandwidth
+                # Drop frames beyond the FPS cap to save CPU and bandwidth. Frames are
+                # sent on a fixed schedule, with half an interval of slack, because a
+                # camera running at exactly CAMERA_FPS delivers some frames slightly
+                # early and a strict gap check would drop about half of them.
                 now = time.monotonic()
-                if now - last_sent < interval:
+                if now < next_send - interval / 2:
                     continue
+                # Move to the next slot, or restart the schedule after a stall
+                next_send = max(next_send + interval, now)
                 if self._last_frame_time is not None:
                     instant = 1.0 / (now - self._last_frame_time)
                     self.measured_fps = 0.9 * self.measured_fps + 0.1 * instant
                 self._last_frame_time = now
-                last_sent = now
 
                 ok, buffer = cv2.imencode(".jpg", frame, encode_params)
                 if ok:

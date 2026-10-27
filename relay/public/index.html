@@ -16,15 +16,10 @@
   </header>
 
   <main>
-    <section class="viewer" id="viewer">
+    <section class="viewer">
       <img id="stream" alt="Live camera feed">
       <p class="viewer-message" id="message">Connecting...</p>
     </section>
-
-    <div class="controls">
-      <button class="button" type="button" id="snapshot">Save snapshot</button>
-      <button class="button" type="button" id="fullscreen">Full screen</button>
-    </div>
   </main>
 
   <footer class="site-footer">
@@ -34,7 +29,6 @@
 
   <script>
     const stream = document.getElementById("stream");
-    const viewer = document.getElementById("viewer");
     const message = document.getElementById("message");
     const details = document.getElementById("details");
 
@@ -105,22 +99,6 @@
     });
 
     connect();
-
-    document.getElementById("snapshot").addEventListener("click", () => {
-      if (!stream.src) return;
-      const link = document.createElement("a");
-      link.href = stream.src;
-      link.download = "dogs-n-denim.jpg";
-      link.click();
-    });
-
-    document.getElementById("fullscreen").addEventListener("click", () => {
-      if (document.fullscreenElement) {
-        document.exitFullscreen();
-      } else if (viewer.requestFullscreen) {
-        viewer.requestFullscreen();
-      }
-    });
   </script>
 </body>
 </html>
