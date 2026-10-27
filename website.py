@@ -15,6 +15,8 @@ CAMERA_HEIGHT = int(os.environ.get("CAMERA_HEIGHT", 720))
 CAMERA_FPS = float(os.environ.get("CAMERA_FPS", 15))
 JPEG_QUALITY = int(os.environ.get("JPEG_QUALITY", 80))
 RETRY_SECONDS = 2.0
+# If an open camera gives no frames for this long, restart the whole program
+STALL_SECONDS = 15.0
 HOST = os.environ.get("HOST", "0.0.0.0")
 PORT = int(os.environ.get("PORT", 5000))
 # The Cloudflare relay that viewers watch through, e.g. wss://dogsndenim.<you>.workers.dev/ingest
@@ -46,7 +48,19 @@ class Camera:
         self.connected = False
         self.measured_fps = 0.0
         self._last_frame_time = None
+        self._last_read = time.monotonic()
         threading.Thread(target=self._run, daemon=True).start()
+        threading.Thread(target=self._watchdog, daemon=True).start()
+
+    def _watchdog(self):
+        # A hung camera can block capture.read() forever without reporting an error,
+        # and a blocked read can't be interrupted. Exiting lets systemd restart us,
+        # which reopens the camera from scratch.
+        while True:
+            time.sleep(5)
+            if self.connected and time.monotonic() - self._last_read > STALL_SECONDS:
+                print(f"Camera {CAMERA_INDEX} froze, restarting...", flush=True)
+                os._exit(1)
 
     def _publish(self, jpeg):
         with self._condition:
@@ -83,6 +97,7 @@ class Camera:
                 continue
 
             print(f"Camera {CAMERA_INDEX} opened", flush=True)
+            self._last_read = time.monotonic()
             self.connected = True
             failures = 0
             next_send = 0.0
@@ -94,6 +109,7 @@ class Camera:
                     time.sleep(0.1)
                     continue
                 failures = 0
+                self._last_read = time.monotonic()
 
                 # Drop frames beyond the FPS cap to save CPU and bandwidth. Frames are
                 # sent on a fixed schedule, with half an interval of slack, because a
