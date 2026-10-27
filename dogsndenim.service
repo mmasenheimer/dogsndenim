@@ -26,6 +26,8 @@ Environment=CAMERA_HEIGHT=720
 Environment=CAMERA_FPS=15
 Environment=JPEG_QUALITY=80
 Environment=PORT=5000
+# RELAY_URL and RELAY_KEY live in relay.env so the key stays out of git (see README.md)
+EnvironmentFile=-/home/pi/dogsndenim/relay.env
 Restart=always
 RestartSec=5
 

@@ -1,0 +1,19 @@
+# Cloudflare Worker that relays the Pi's camera to every viewer.
+# Deploy with `npx wrangler deploy` from this folder (see README.md).
+
+name = "dogsndenim"
+main = "src/index.js"
+compatibility_date = "2025-09-01"
+
+# index.html and style.css are served straight from Cloudflare's edge
+[assets]
+directory = "./public"
+
+[[durable_objects.bindings]]
+name = "SHOW"
+class_name = "Show"
+
+# SQLite-backed Durable Objects are the kind available on the free plan
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Show"]

@@ -1,3 +1,7 @@
 keys*
 venv/
 __pycache__/
+relay.env
+relay/node_modules/
+relay/.wrangler/
+relay/.dev.vars

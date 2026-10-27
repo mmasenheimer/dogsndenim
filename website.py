@@ -5,7 +5,8 @@ import time
 
 import cv2
 import numpy as np
-from flask import Flask, Response, jsonify, render_template
+import websocket
+from flask import Flask, Response, jsonify, redirect
 
 # Settings can be overridden with environment variables (see dogsndenim.service).
 CAMERA_INDEX = int(os.environ.get("CAMERA_INDEX", 0))
@@ -16,6 +17,9 @@ JPEG_QUALITY = int(os.environ.get("JPEG_QUALITY", 80))
 RETRY_SECONDS = 2.0
 HOST = os.environ.get("HOST", "0.0.0.0")
 PORT = int(os.environ.get("PORT", 5000))
+# The Cloudflare relay that viewers watch through, e.g. wss://dogsndenim.<you>.workers.dev/ingest
+RELAY_URL = os.environ.get("RELAY_URL")
+RELAY_KEY = os.environ.get("RELAY_KEY", "")
 
 
 def make_placeholder(text):
@@ -118,25 +122,60 @@ class Camera:
         with self._condition:
             return self._frame
 
-    def stream(self):
+    def frames(self):
         last_id = -1
         while True:
             with self._condition:
                 # Wait for a new frame; on timeout, resend the last one as a keepalive
                 self._condition.wait_for(lambda: self._frame_id != last_id, timeout=5)
                 frame, last_id = self._frame, self._frame_id
+            yield frame
+
+    def stream(self):
+        for frame in self.frames():
             # multipart/x-mixed-replace tells the browser to keep replacing the old image with the new one
             yield (b"--frame\r\n"
                    b"Content-Type: image/jpeg\r\n\r\n" + frame + b"\r\n")
 
 
+def push_to_relay(camera):
+    """Sends each frame once to the Cloudflare relay, which copies it to every viewer.
+
+    The Pi's work and upload stay the same no matter how many people are watching.
+    """
+    while True:
+        try:
+            relay = websocket.create_connection(
+                RELAY_URL, timeout=10, header=[f"Authorization: Bearer {RELAY_KEY}"])
+        except Exception as error:
+            print(f"Can't reach the relay ({error}), retrying...", flush=True)
+            time.sleep(RETRY_SECONDS)
+            continue
+
+        print("Connected to the relay", flush=True)
+        try:
+            # If the upload can't keep up, frames() skips to the newest frame
+            for frame in camera.frames():
+                relay.send_binary(frame)
+        except Exception as error:
+            print(f"Lost the relay connection ({error}), reconnecting...", flush=True)
+        finally:
+            relay.close()
+        time.sleep(RETRY_SECONDS)
+
+
+# Flask is only for checking the camera on the local network; the public site is the relay
 app = Flask(__name__)
 camera = Camera()
+if RELAY_URL:
+    threading.Thread(target=push_to_relay, args=(camera,), daemon=True).start()
+else:
+    print("RELAY_URL isn't set, so nothing is sent to Cloudflare", flush=True)
 
 
 @app.route("/")
 def index():
-    return render_template("index.html")
+    return redirect("/video_feed")
 
 
 @app.route("/video_feed")

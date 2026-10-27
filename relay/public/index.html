@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dogs n Denim</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pacifico&display=swap">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="site-header">
+    <h1>Dogs n Denim</h1>
+    <p class="tagline">We hosted a website and Wi-Fi... on a dog... for a dog fashion show.</p>
+  </header>
+
+  <main>
+    <section class="viewer" id="viewer">
+      <img id="stream" alt="Live camera feed">
+      <p class="viewer-message" id="message">Connecting...</p>
+    </section>
+
+    <div class="controls">
+      <button class="button" type="button" id="snapshot">Save snapshot</button>
+      <button class="button" type="button" id="fullscreen">Full screen</button>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <span id="details"></span>
+    <span class="credit">Brought to you by <strong>CATalyst Studios</strong></span>
+  </footer>
+
+  <script>
+    const stream = document.getElementById("stream");
+    const viewer = document.getElementById("viewer");
+    const message = document.getElementById("message");
+    const details = document.getElementById("details");
+
+    // The browser acknowledges frames in batches so the relay knows how far behind we are
+    const ACK_EVERY = 5;
+    let socket = null;
+    let status = { live: false, viewers: 0 };
+    let framesThisSecond = 0;
+    let fps = 0;
+
+    function showMessage(text) {
+      message.textContent = text;
+      message.hidden = !text;
+    }
+
+    function updateDetails() {
+      if (!status.live) {
+        details.textContent = "";
+        return;
+      }
+      const watching = `${status.viewers} watching`;
+      details.textContent = fps ? `${watching} · ${fps} fps` : watching;
+    }
+
+    function connect() {
+      const protocol = location.protocol === "https:" ? "wss:" : "ws:";
+      socket = new WebSocket(`${protocol}//${location.host}/ws`);
+      socket.binaryType = "blob";
+      let received = 0;
+
+      socket.addEventListener("message", (event) => {
+        if (typeof event.data === "string") {
+          status = JSON.parse(event.data);
+          if (!status.live) showMessage("The camera is offline. It'll be back soon!");
+          updateDetails();
+          return;
+        }
+        const previous = stream.src;
+        stream.src = URL.createObjectURL(event.data);
+        if (previous) URL.revokeObjectURL(previous);
+        showMessage("");
+        framesThisSecond += 1;
+        received += 1;
+        if (received % ACK_EVERY === 0) socket.send(String(ACK_EVERY));
+      });
+
+      socket.addEventListener("close", () => {
+        socket = null;
+        if (document.hidden) return;
+        showMessage("Reconnecting...");
+        setTimeout(connect, 2000);
+      });
+    }
+
+    setInterval(() => {
+      fps = framesThisSecond;
+      framesThisSecond = 0;
+      updateDetails();
+    }, 1000);
+
+    // Stop downloading video while the tab is in the background to save the viewer's data
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) {
+        socket?.close();
+      } else if (!socket) {
+        connect();
+      }
+    });
+
+    connect();
+
+    document.getElementById("snapshot").addEventListener("click", () => {
+      if (!stream.src) return;
+      const link = document.createElement("a");
+      link.href = stream.src;
+      link.download = "dogs-n-denim.jpg";
+      link.click();
+    });
+
+    document.getElementById("fullscreen").addEventListener("click", () => {
+      if (document.fullscreenElement) {
+        document.exitFullscreen();
+      } else if (viewer.requestFullscreen) {
+        viewer.requestFullscreen();
+      }
+    });
+  </script>
+</body>
+</html>
