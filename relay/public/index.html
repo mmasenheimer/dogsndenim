@@ -10,6 +10,8 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <div class="rain" id="rain" aria-hidden="true"></div>
+
   <header class="site-header">
     <h1>Dogs n Denim</h1>
     <p class="tagline">We hosted a website and Wi-Fi... on a dog... for a dog fashion show.</p>
@@ -31,6 +33,7 @@
     const stream = document.getElementById("stream");
     const message = document.getElementById("message");
     const details = document.getElementById("details");
+    const rain = document.getElementById("rain");
 
     // The browser acknowledges frames in batches so the relay knows how far behind we are
     const ACK_EVERY = 5;
@@ -53,11 +56,39 @@
       details.textContent = fps ? `${watching} · ${fps} fps` : watching;
     }
 
+    // Dogs fall behind the page while the visitor is connected
+    let rainTimer = null;
+
+    function dropDog() {
+      const dog = document.createElement("img");
+      dog.src = "dog.jpg";
+      dog.alt = "";
+      const size = 40 + Math.random() * 50;
+      dog.style.width = dog.style.height = `${size}px`;
+      dog.style.left = `${Math.random() * 100}vw`;
+      dog.style.animationDuration = `${5 + Math.random() * 5}s`;
+      dog.style.setProperty("--spin", `${Math.random() * 720 - 360}deg`);
+      dog.addEventListener("animationend", () => dog.remove());
+      rain.append(dog);
+    }
+
+    function startRain() {
+      if (rainTimer || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+      rainTimer = setInterval(dropDog, 400);
+    }
+
+    function stopRain() {
+      clearInterval(rainTimer);
+      rainTimer = null;
+    }
+
     function connect() {
       const protocol = location.protocol === "https:" ? "wss:" : "ws:";
       socket = new WebSocket(`${protocol}//${location.host}/ws`);
       socket.binaryType = "blob";
       let received = 0;
+
+      socket.addEventListener("open", startRain);
 
       socket.addEventListener("message", (event) => {
         if (typeof event.data === "string") {
@@ -77,6 +108,7 @@
 
       socket.addEventListener("close", () => {
         socket = null;
+        stopRain();
         if (document.hidden) return;
         showMessage("Reconnecting...");
         setTimeout(connect, 2000);

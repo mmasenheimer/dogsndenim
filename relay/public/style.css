@@ -36,10 +36,45 @@ body {
 .site-header,
 main,
 .site-footer {
+  position: relative;
+  z-index: 1;
   width: 100%;
   max-width: 1100px;
   margin: 0 auto;
   padding: 0 16px;
+}
+
+/* Falling dog photos, behind everything else on the page */
+.rain {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.rain img {
+  position: absolute;
+  top: 0;
+  border-radius: 50%;
+  object-fit: cover;
+  opacity: 0.55;
+  animation: fall linear forwards;
+}
+
+@keyframes fall {
+  from {
+    transform: translate(-50%, -120px) rotate(0deg);
+  }
+  to {
+    transform: translate(-50%, calc(100vh + 120px)) rotate(var(--spin));
+  }
+}
+
+/* A glow in the background color keeps text readable when a dog falls behind it */
+.site-header,
+.site-footer {
+  text-shadow: 0 0 4px var(--bg), 0 0 8px var(--bg), 0 0 12px var(--bg);
 }
 
 .site-header {
